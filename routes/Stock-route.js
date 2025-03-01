@@ -1,7 +1,23 @@
 const express = require("express");
 const Stock = require("../Models/Stock");
+const path = require("path");
+const multer = require("multer");
+
 
 const router = express.Router();
+
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "public/uploads"));
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
+
 
 router.get("/", async (req, res, next) => {
   try {
@@ -53,7 +69,12 @@ router.get("/:id", getByID, async (req, res) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const newStock = new Stock(req.body);
+    const stockData = req.body;
+    if(stockData.image){
+      stockData.image = req.file.path;
+
+    }
+    const newStock = new Stock(stockData);
     await newStock.save();
     res
       .status(201)
@@ -63,10 +84,14 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.put("/:id", getByID, async (req, res, next) => {
+router.put("/:id", getByID, upload.single('image'), async (req, res, next) => {
   try {
     const stock = req.stock;
     Object.assign(stock, req.body);
+
+    if(req.file){
+      stock.image = req.file.path;
+    }
 
     await stock.save();
     res
