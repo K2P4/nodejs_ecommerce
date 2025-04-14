@@ -20,7 +20,6 @@ const StockSchema = new mongoose.Schema(
     reorderLevel: { type: Number, required: false },
     time: { type: Date, default: Date.now },
     createdBy: { type: String, default: null },
-    updatedBy: { type: String, default: null },
     cartQuantity: { type: Number, default: 0 },
     isInCart: { type: Boolean, default: false },
   },

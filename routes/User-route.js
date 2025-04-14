@@ -1,8 +1,6 @@
 const express = require("express");
 const User = require("../Models/User");
 const router = express.Router();
-const ExcelJs = require("exceljs");
-const multer = require("multer");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -39,7 +37,7 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({ message: "Invalid credentials" });
   }
 
-  const isMatch = bcrypt.compare(password, user.password);
+  const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     return res.status(400).json({ message: "Invalid credentials" });
   }
@@ -47,7 +45,7 @@ router.post("/login", async (req, res) => {
   const token = jwt.sign(
     { id: user._id, name: user.name },
     process.env.JWT_SECRET,
-    { expiresIn: "24h" }
+    { expiresIn: "7h" }
   );
 
   res.json({ message: "Login successful", token, success: true, user: user });

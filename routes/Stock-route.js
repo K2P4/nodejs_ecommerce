@@ -26,6 +26,9 @@ const storage = multer.diskStorage({
   },
 });
 
+const uploadMemory = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: storage });
+
 const authenticateUser = (req, res, next) => {
   const token = req.header("Authorization")?.split(" ")[1];
   if (!token) {
@@ -40,9 +43,6 @@ const authenticateUser = (req, res, next) => {
     return res.status(400).json({ message: "Invalid token" });
   }
 };
-
-const uploadMemory = multer({ storage: multer.memoryStorage() });
-const upload = multer({ storage: storage });
 
 router.get("/export", async (req, res) => {
   try {
@@ -149,6 +149,7 @@ const getByID = async (req, res, next) => {
     }
 
     req.stock = stock;
+
     next();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -156,7 +157,26 @@ const getByID = async (req, res, next) => {
 };
 
 router.get("/:id", authenticateUser, getByID, async (req, res) => {
-  res.status(200).json({ message: "Sucessfull", stock: req.stock });
+  try {
+    const stock = req.stock;
+
+    let stockDataByCategory = [];
+
+    if (stock.categoryId) {
+      stockDataByCategory = await Stock.find({
+        categoryId: stock.categoryId._id,
+        _id: { $ne: stock._id },
+      }).populate("categoryId");
+    }
+
+    res.status(200).json({
+      message: "Successful",
+      stock,
+      stockDataByCategory,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post(
@@ -201,6 +221,7 @@ router.post(
   }
 );
 
+
 router.put(
   "/:id",
   authenticateUser,
@@ -218,7 +239,7 @@ router.put(
         req.body.categoryId = null;
       }
 
-      req.body.updatedBy = req.user.name;
+      req.body.createdBy = req.user.name;
 
       if (req.files && req.files.length > 0) {
         stock.images.forEach((imgUrl) => {
