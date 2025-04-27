@@ -11,15 +11,36 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    let stockCode = req.body.code || `Stock${Date.now()}`;
-    const uploadPath = path.join(__dirname, "..", "public/uploads", stockCode);
+  destination: async function (req, file, cb) {
+    try {
+      let stockCode = req.body.code;
 
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
+      if (!stockCode) {
+        const lastStock = await Stock.findOne().sort({ createdAt: -1 });
+        if (lastStock && lastStock.code) {
+          const lastNumber = parseInt(lastStock.code.slice(1));
+          const nextNumber = lastNumber + 1;
+          stockCode = "P" + nextNumber.toString().padStart(3, "0");
+        } else {
+          stockCode = "P001";
+        }
+        req.body.code = stockCode;
+      }
+
+      const uploadPath = path.join(
+        __dirname,
+        "..",
+        "public/uploads",
+        stockCode
+      );
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+
+      cb(null, uploadPath);
+    } catch (error) {
+      cb(error);
     }
-
-    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + "-" + file.originalname);
@@ -125,9 +146,12 @@ router.get("/", authenticateUser, async (req, res, next) => {
       .limit(perpage)
       .skip(offset);
     const totalCount = await Stock.countDocuments(filter);
+    const totalPage = Math.ceil(totalCount / perpage); 
 
+    
     res.status(200).json({
       total: totalCount,
+      totalPage:totalPage,
       page,
       perpage,
       data: stocks,
@@ -179,6 +203,24 @@ router.get("/:id", authenticateUser, getByID, async (req, res) => {
   }
 });
 
+// const generateStockCode = async (req, res, next) => {
+//   try {
+//     const lastStock = await Stock.findOne().sort({ createdAt: -1 });
+
+//     if (lastStock && lastStock.code) {
+//       const lastNumber = parseInt(lastStock.code.slice(1));
+//       const nextNumber = lastNumber + 1;
+//       req.body.code = "P" + nextNumber.toString().padStart(3, "0");
+//     } else {
+//       req.body.code = "P001";
+//     }
+
+//     next();
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// };
+
 router.post(
   "/",
   authenticateUser,
@@ -186,6 +228,7 @@ router.post(
   async (req, res) => {
     try {
       const stockData = req.body;
+
       stockData.price = Number(stockData.price);
       stockData.discountPercentage = Number(stockData.discountPercentage);
       stockData.inStock = Number(stockData.inStock);
@@ -195,21 +238,19 @@ router.post(
         stockData.categoryId = null;
       }
 
-      if (req.files && req.files.length > 0) {
+      if (req.files && req.files.length > 0 && stockData.code) {
         stockData.images = req.files.map(
           (file) =>
             `${req.protocol}://${req.get("host")}/public/uploads/${
-              req.body.code
+              stockData.code
             }/${path.basename(file.path)}`
         );
       }
 
       stockData.createdBy = req.user.name;
-
-      console.log(req.body);
-
       const newStock = new Stock(stockData);
       await newStock.save();
+
       res.status(201).json({
         message: "Stock item added successfully",
         data: newStock,
@@ -220,7 +261,6 @@ router.post(
     }
   }
 );
-
 
 router.put(
   "/:id",

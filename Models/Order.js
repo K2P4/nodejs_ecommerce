@@ -10,16 +10,26 @@ const OrderSchema = new mongoose.Schema(
     },
     items: { type: Array, required: true },
     totalAmount: { type: Number, required: true },
-    deliveryFee: { type: Number, default: 0 },
     status: {
-      type: String,
-      enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
-      default: "Pending",
+      type: Number,
+      required: true,
+      default: 0,
     },
-    shippingAddress: { type: String, required: true },
+    deliveryDate:{ type: Date, required: false },
+    paymentType: { type: Number, required: true, default: 0 },
+    name: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: { type: Number, required: true },
+    transitionRecord: { type: String, required: false },
+    deliveryType: { type: Number, required: true, default: 0 },
+    address: { type: String, required: true },
+    city: { type: String, required: true },
+    township: { type: String, required: true },
   },
   { timestamps: true }
 );
 
 const Order = mongoose.model("Order", OrderSchema);
+
+OrderSchema.index({ "$**": "text" });
 module.exports = Order;

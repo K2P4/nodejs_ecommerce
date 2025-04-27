@@ -6,7 +6,6 @@ const xlsx = require("xlsx");
 const stockRoutes = require("./routes/Stock-route");
 const categoryRoutes = require("./routes/Category-route");
 const userRoutes = require("./routes/User-route");
-const deliveryRoutes = require("./routes/Delivery-route");
 const orderRoutes = require("./routes/Order-route");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -23,7 +22,6 @@ app.use("/api/category", categoryRoutes);
 
 app.use("/api/", userRoutes);
 app.use("/api/order", orderRoutes);
-app.use("/api/cart", deliveryRoutes);
 
 const baseUrl = process.env.APP_URL || "http://127.0.0.1:3000";
 
