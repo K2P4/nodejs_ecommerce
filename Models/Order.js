@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const OrderSchema = new mongoose.Schema(
   {
     orderNumber: { type: String, required: true, unique: true },
+    invoiceNumber: { type: String, required: true, unique: true },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -15,7 +16,7 @@ const OrderSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
-    deliveryDate:{ type: Date, required: false },
+    deliveryDate: { type: Date, required: false },
     paymentType: { type: Number, required: true, default: 0 },
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -25,6 +26,7 @@ const OrderSchema = new mongoose.Schema(
     address: { type: String, required: true },
     city: { type: String, required: true },
     township: { type: String, required: true },
+    payDate: { type: String, required: false },
   },
   { timestamps: true }
 );

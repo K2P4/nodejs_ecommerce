@@ -3,9 +3,13 @@ const Order = require("../Models/Order");
 const path = require("path");
 const router = express.Router();
 const multer = require("multer");
+const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 const Stock = require("../Models/Stock");
+
+const TELEGRAM_BOT_TOKEN = "7998706631:AAHBJu9PzCPJ7k5KGMOqZdlEOZXr62p9q9Y";
+const TELEGRAM_CHAT_ID = "7998706631";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -33,81 +37,6 @@ const authenticateUser = (req, res, next) => {
     return res.status(400).json({ message: "Invalid token" });
   }
 };
-
-router.post(
-  "/place-order",
-  authenticateUser,
-  upload.single("transitionRecord"),
-  async (req, res) => {
-    try {
-      const {
-        items,
-        paymentType,
-        name,
-        email,
-        phone,
-        deliveryType,
-        address,
-        city,
-        township,
-      } = req.body;
-
-      const parsedItems = JSON.parse(items);
-
-      for (const item of parsedItems) {
-        const product = await Stock.findById(item.id);
-        if (product) {
-          product.inStock = Math.max(0, product.inStock - item.quantity);
-          await product.save();
-        }
-      }
-
-      let transitionRecordUrl = null;
-      if (req.file) {
-        transitionRecordUrl = `${req.protocol}://${req.get(
-          "host"
-        )}/public/transition/${req.file.filename}`;
-      }
-
-      let deliveryFee = deliveryType == 0 ? 3000 : 5000;
-      let subTotal = parsedItems.reduce((total, item) => total + item.price, 0);
-      let allTotalAmount = deliveryFee + subTotal;
-      let taxAmount = subTotal > 200000 ? Math.round(subTotal * 0.005) : 0;
-      allTotalAmount += taxAmount;
-
-      const order = new Order({
-        orderNumber: uuidv4().slice(0, 8).toUpperCase(),
-        userId: req.user.id,
-        items: parsedItems,
-        totalAmount: allTotalAmount,
-        status: paymentType == 2 ? 1 : 0,
-        paymentType,
-        name,
-        email,
-        phone,
-        deliveryType,
-        address,
-        city,
-        township,
-        transitionRecord: transitionRecordUrl,
-      });
-
-      await order.save();
-
-      res.status(201).json({
-        message: "Order placed successfully",
-        success: true,
-        order,
-      });
-    } catch (error) {
-      console.error("Order placement failed:", error);
-      res.status(500).json({
-        message: "Error placing order",
-        error: error.message,
-      });
-    }
-  }
-);
 
 router.get("/", authenticateUser, async (req, res, next) => {
   try {
@@ -144,7 +73,15 @@ router.get("/", authenticateUser, async (req, res, next) => {
 
     const sortValue = sortOrder == "asc" ? 1 : -1;
     const sortField = "createdAt";
+    const pendingCount = await Order.countDocuments({ status: 0 });
 
+
+    const totalAmountAgg = await Order.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]);
+
+    const allTotalAmount = totalAmountAgg[0]?.total || 0;
     const orders = await Order.find(filter)
       .sort({ [sortField]: sortValue })
       .limit(perpage)
@@ -153,16 +90,149 @@ router.get("/", authenticateUser, async (req, res, next) => {
     const totalPages = Math.ceil(totalCount / perpage);
     res.status(200).json({
       total: totalCount,
-      totalPages:totalPages,
+      totalPages: totalPages,
       page,
       perpage,
       data: orders,
       sort: sortOrder,
+      pendingCount: pendingCount,
+      allTotalAmount: allTotalAmount,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+router.post(
+  "/place-order",
+  authenticateUser,
+  upload.single("transitionRecord"),
+  async (req, res) => {
+    try {
+      const {
+        items,
+        paymentType,
+        name,
+        email,
+        phone,
+        deliveryType,
+        address,
+        city,
+        township,
+      } = req.body;
+
+      const parsedItems = JSON.parse(items);
+
+      // Update stock
+      for (const item of parsedItems) {
+        const product = await Stock.findById(item.id);
+        if (product) {
+          product.inStock = Math.max(0, product.inStock - item.quantity);
+          await product.save();
+        }
+      }
+
+      // Handle file
+      let transitionRecordUrl = null;
+      if (req.file) {
+        transitionRecordUrl = `${req.protocol}://${req.get(
+          "host"
+        )}/public/transition/${req.file.filename}`;
+      }
+
+      // Calculate totals
+      const deliveryFee = deliveryType == 0 ? 3000 : 5000;
+      const subTotal = parsedItems.reduce(
+        (total, item) => total + item.price,
+        0
+      );
+      const taxAmount = subTotal > 200000 ? Math.round(subTotal * 0.005) : 0;
+      const allTotalAmount = subTotal + deliveryFee + taxAmount;
+
+      // Generate order numbers
+      const lastOrder = await Order.findOne().sort({ createdAt: -1 });
+
+      let orderNumber = "XO0001";
+      let invoiceNumber = "XI0001";
+
+      if (lastOrder?.orderNumber) {
+        const orderNum = parseInt(lastOrder.orderNumber.slice(2)) + 1;
+        orderNumber = "XO" + orderNum.toString().padStart(4, "0");
+      }
+
+      if (lastOrder?.invoiceNumber) {
+        const invoiceNum = parseInt(lastOrder.invoiceNumber.slice(2)) + 1;
+        invoiceNumber = "XI" + invoiceNum.toString().padStart(4, "0");
+      }
+
+      // Create order
+      const order = new Order({
+        orderNumber,
+        invoiceNumber,
+        userId: req.user.id,
+        items: parsedItems,
+        totalAmount: allTotalAmount,
+        status: paymentType == 2 ? 1 : 0,
+        paymentType,
+        name,
+        email,
+        phone,
+        deliveryType,
+        address,
+        city,
+        township,
+        transitionRecord: transitionRecordUrl,
+      });
+
+      await order.save();
+
+      // Send Telegram Notification
+      const telegramMessage = `
+🛒 *New Order Placed!*
+
+🧾 *Order No:* \`${orderNumber}\`
+📄 *Invoice No:* \`${invoiceNumber}\`
+🙍 *Name:* ${name}
+📞 *Phone:* ${phone}
+📦 *Items:* ${parsedItems.length}
+🚚 *Delivery:* ${deliveryType == 0 ? "Normal (3000 MMK)" : "Express (5000 MMK)"}
+💵 *Payment:* ${paymentType == 1 ? "Cash on Delivery" : "Mobile Payment"}
+💰 *Total Amount:* ${allTotalAmount.toLocaleString()} MMK
+`;
+
+      await axios
+        .post(
+          `https://api.telegram.org/bot7998706631:AAHBJu9PzCPJ7k5KGMOqZdlEOZXr62p9q9Y/sendMessage`,
+          {
+            chat_id: "7998706631",
+            text: telegramMessage,
+            parse_mode: "Markdown",
+          }
+        )
+        .then((response) => {
+          console.log("Telegram response:", response.data);
+        })
+        .catch((error) => {
+          console.error(
+            "Telegram API error:",
+            error.response ? error.response.data : error.message
+          );
+        });
+
+      res.status(201).json({
+        message: "Order placed successfully",
+        success: true,
+        order,
+      });
+    } catch (error) {
+      console.error("Order placement failed:", error);
+      res.status(500).json({
+        message: "Error placing order",
+        error: error.message,
+      });
+    }
+  }
+);
 
 const getByID = async (req, res, next) => {
   try {
