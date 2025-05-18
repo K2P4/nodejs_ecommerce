@@ -2,26 +2,25 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const xlsx = require("xlsx");
 const stockRoutes = require("./routes/Stock-route");
 const categoryRoutes = require("./routes/Category-route");
 const userRoutes = require("./routes/User-route");
 const orderRoutes = require("./routes/Order-route");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
+const invoiceRoutes = require("./routes/Invoice-route");
+
 
 const app = express();
-
 app.use(express.json());
-
 app.use("/public", express.static("public"));
 app.use(cors());
+app.set("view engine", "ejs");
+app.set("views", __dirname + "/views");
 
+app.use("/api/order", orderRoutes);
 app.use("/api/stocks", stockRoutes);
 app.use("/api/category", categoryRoutes);
-
+app.use("/api/invoice", invoiceRoutes);
 app.use("/api/", userRoutes);
-app.use("/api/order", orderRoutes);
 
 const baseUrl = process.env.APP_URL || "http://127.0.0.1:3000";
 

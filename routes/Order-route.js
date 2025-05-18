@@ -4,10 +4,13 @@ const path = require("path");
 const router = express.Router();
 const multer = require("multer");
 const axios = require("axios");
-const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 const Stock = require("../Models/Stock");
-
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const pdf = require("pdf-creator-node");
+const ejs = require("ejs");
+const Invoice = require("../Models/Invoice");
 const TELEGRAM_BOT_TOKEN = "7998706631:AAHBJu9PzCPJ7k5KGMOqZdlEOZXr62p9q9Y";
 const TELEGRAM_CHAT_ID = "7998706631";
 
@@ -38,70 +41,86 @@ const authenticateUser = (req, res, next) => {
   }
 };
 
-router.get("/", authenticateUser, async (req, res, next) => {
+router.post("/download-invoice", authenticateUser, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const perpage = parseInt(req.query.perpage) || 10;
-    const search = req.query.search;
-    const selectedDate = req.query.time;
-    const sortOrder = req.query.sort || "desc";
-    const statusFilter = req.query.status;
-
-    const filter = {};
-    const offset = (page - 1) * perpage;
-
-    if (search) {
-      filter["$text"] = { $search: search };
+    const { orderId } = req.body;
+    const orderData = await Order.findById(orderId).lean();
+    if (!orderData) {
+      return res.status(404).json({ message: "Order not found." });
     }
 
-    if (selectedDate) {
-      const startOfDay = new Date(selectedDate);
-      const endOfDay = new Date(startOfDay);
-      endOfDay.setHours(23, 59, 59, 999);
+    // Replace spaces in customer name with underscores
+    const customerNameSafe = orderData.name.split(" ").join("_");
+    const invoiceNumberSafe = orderData.invoiceNumber.toString();
 
-      filter.createdAt = { $gte: startOfDay, $lte: endOfDay };
-    }
+    const fileName = `${customerNameSafe}_${invoiceNumberSafe}.pdf`;
+    const filePath = `./invoices/${fileName}`;
 
-    if (statusFilter !== 7 && statusFilter !== "7") {
-      if (typeof statusFilter === "string" && statusFilter.includes(",")) {
-        const statusArray = statusFilter.split(",").map(Number);
-        filter.status = { $in: statusArray };
-      } else {
-        filter.status = parseInt(statusFilter);
-      }
-    }
+    // Render EJS template to HTML string
+    const html = await ejs.renderFile(
+      path.join(__dirname, "../views/layout.ejs"),
+      { order: orderData },
+      { async: true }
+    );
 
-    const sortValue = sortOrder == "asc" ? 1 : -1;
-    const sortField = "createdAt";
-    const pendingCount = await Order.countDocuments({ status: 0 });
+    // PDF document options
+    const options = {
+      format: "A4",
+      orientation: "portrait",
+      border: "10mm",
+    };
 
+    const document = {
+      html: html,
+      data: {},
+      path: filePath,
+      type: "",
+    };
 
-    const totalAmountAgg = await Order.aggregate([
-      { $match: filter },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-    ]);
-
-    const allTotalAmount = totalAmountAgg[0]?.total || 0;
-    const orders = await Order.find(filter)
-      .sort({ [sortField]: sortValue })
-      .limit(perpage)
-      .skip(offset);
-    const totalCount = await Order.countDocuments(filter);
-    const totalPages = Math.ceil(totalCount / perpage);
-    res.status(200).json({
-      total: totalCount,
-      totalPages: totalPages,
-      page,
-      perpage,
-      data: orders,
-      sort: sortOrder,
-      pendingCount: pendingCount,
-      allTotalAmount: allTotalAmount,
-    });
+    await pdf.create(document, options);
+    res.download(filePath, fileName);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error generating PDF:", error);
+    res.status(500).send("Error generating PDF");
   }
 });
+
+// router.post("/download-invoice", authenticateUser, async (req, res) => {
+//   try {
+//     const { orderId } = req.body;
+//     const orderData = await Order.findById(orderId).lean();
+//     if (!orderData) {
+//       return res.status(404).json({ message: "Order not found." });
+//     }
+
+//     // render ejs template to html string
+//     const html = await ejs.renderFile(
+//       path.join(__dirname, "../views/layout.ejs"),
+//       { order: orderData },
+//       { async: true }
+//     );
+
+//     // document options
+//     const options = {
+//       format: "A4",
+//       orientation: "portrait",
+//       border: "10mm",
+//     };
+
+//     const document = {
+//       html: html,
+//       data: {},
+//       path: `./invoices/${orderData.name}-${orderData.invoiceNumber}.pdf`,
+//       type: "",
+//     };
+
+//     await pdf.create(document, options);
+//     res.download(document.path, `${orderData.name}-${orderData.invoiceNumber}.pdf`);
+//   } catch (error) {
+//     console.error("Error generating PDF:", error);
+//     res.status(500).send("Error generating PDF");
+//   }
+// });
 
 router.post(
   "/place-order",
@@ -150,7 +169,9 @@ router.post(
       const allTotalAmount = subTotal + deliveryFee + taxAmount;
 
       // Generate order numbers
-      const lastOrder = await Order.findOne().sort({ createdAt: -1 });
+      const lastOrder = await Order.findOne()
+        .sort({ createdAt: -1 })
+        .populate("invoiceId");
 
       let orderNumber = "XO0001";
       let invoiceNumber = "XI0001";
@@ -160,15 +181,20 @@ router.post(
         orderNumber = "XO" + orderNum.toString().padStart(4, "0");
       }
 
-      if (lastOrder?.invoiceNumber) {
-        const invoiceNum = parseInt(lastOrder.invoiceNumber.slice(2)) + 1;
+      if (lastOrder?.invoiceId?.invoiceNumber) {
+        const invoiceNum = parseInt(lastOrder.invoiceId.invoiceNumber.slice(2)) + 1;
         invoiceNumber = "XI" + invoiceNum.toString().padStart(4, "0");
       }
 
-      // Create order
+      // Create invoice
+      const invoice = new Invoice({
+        invoiceNumber,
+      });
+
+      await invoice.save();
+
       const order = new Order({
         orderNumber,
-        invoiceNumber,
         userId: req.user.id,
         items: parsedItems,
         totalAmount: allTotalAmount,
@@ -182,42 +208,12 @@ router.post(
         city,
         township,
         transitionRecord: transitionRecordUrl,
+        invoiceId: invoice._id,
       });
 
       await order.save();
 
-      // Send Telegram Notification
-      const telegramMessage = `
-🛒 *New Order Placed!*
 
-🧾 *Order No:* \`${orderNumber}\`
-📄 *Invoice No:* \`${invoiceNumber}\`
-🙍 *Name:* ${name}
-📞 *Phone:* ${phone}
-📦 *Items:* ${parsedItems.length}
-🚚 *Delivery:* ${deliveryType == 0 ? "Normal (3000 MMK)" : "Express (5000 MMK)"}
-💵 *Payment:* ${paymentType == 1 ? "Cash on Delivery" : "Mobile Payment"}
-💰 *Total Amount:* ${allTotalAmount.toLocaleString()} MMK
-`;
-
-      await axios
-        .post(
-          `https://api.telegram.org/bot7998706631:AAHBJu9PzCPJ7k5KGMOqZdlEOZXr62p9q9Y/sendMessage`,
-          {
-            chat_id: "7998706631",
-            text: telegramMessage,
-            parse_mode: "Markdown",
-          }
-        )
-        .then((response) => {
-          console.log("Telegram response:", response.data);
-        })
-        .catch((error) => {
-          console.error(
-            "Telegram API error:",
-            error.response ? error.response.data : error.message
-          );
-        });
 
       res.status(201).json({
         message: "Order placed successfully",
@@ -234,11 +230,79 @@ router.post(
   }
 );
 
+router.get("/", authenticateUser, async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const perpage = parseInt(req.query.perpage) || 10;
+    const search = req.query.search;
+    const selectedDate = req.query.time;
+    const sortOrder = req.query.sort || "desc";
+    const statusFilter = req.query.status;
+
+    const filter = {};
+    const offset = (page - 1) * perpage;
+
+    if (search) {
+      filter["$text"] = { $search: search };
+    }
+
+    if (selectedDate) {
+      const startOfDay = new Date(selectedDate);
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      filter.createdAt = { $gte: startOfDay, $lte: endOfDay };
+    }
+
+    if (statusFilter !== 7 && statusFilter !== "7") {
+      if (typeof statusFilter === "string" && statusFilter.includes(",")) {
+        const statusArray = statusFilter.split(",").map(Number);
+        filter.status = { $in: statusArray };
+      } else {
+        filter.status = parseInt(statusFilter);
+      }
+    }
+
+    const sortValue = sortOrder == "asc" ? 1 : -1;
+    const sortField = "createdAt";
+    const pendingCount = await Order.countDocuments({ status: 0 });
+    const totalAmountAgg = await Order.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]);
+
+    const totalTransactions = await Invoice.countDocuments({
+      payDate: { $ne: null },
+    });
+    const allTotalAmount = totalAmountAgg[0]?.total || 0;
+    const orders = await Order.find(filter)
+      .sort({ [sortField]: sortValue })
+      .limit(perpage)
+      .skip(offset)
+      .populate("invoiceId");
+    const totalCount = await Order.countDocuments(filter);
+    const totalPages = Math.ceil(totalCount / perpage);
+    res.status(200).json({
+      total: totalCount,
+      totalPages: totalPages,
+      page,
+      perpage,
+      data: orders,
+      sort: sortOrder,
+      pendingCount: pendingCount,
+      allTotalAmount: allTotalAmount,
+      totalTransactions: totalTransactions,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const getByID = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findById(id).populate("userId");
+    const order = await Order.findById(id).populate("userId").populate("invoiceId");
 
     if (!order) {
       return res.status(404).json({ message: "404 NOT FOUND" });
@@ -258,13 +322,25 @@ router.get("/:id", authenticateUser, getByID, async (req, res) => {
 });
 
 router.delete("/:id", authenticateUser, async (req, res, next) => {
-  const order = await Order.findByIdAndDelete(req.params.id);
+  try {
+    const order = await Order.findById(req.params.id);
 
-  if (!order) {
-    return res.status(404).json({ message: "Order not found" });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.invoiceId) {
+      await Invoice.findByIdAndDelete(order.invoiceId);
+    }
+
+    await Order.findByIdAndDelete(req.params.id);
+
+    res
+      .status(200)
+      .json({ message: "Order and its invoice deleted successfully" });
+  } catch (err) {
+    next(err);
   }
-
-  res.status(200).json({ message: "Order item deleted successfully" });
 });
 
 router.put("/:id", authenticateUser, getByID, async (req, res, next) => {

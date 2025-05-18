@@ -6,13 +6,13 @@ const jwt = require("jsonwebtoken");
 
 //Register
 router.post("/register", async (req, res) => {
-const { name, email, password, password_confirmation, isAdmin } = req.body;
+  const { name, email, password, password_confirmation, isAdmin } = req.body;
 
   if (password !== password_confirmation) {
     return res.status(400).json({ message: "Passwords do not match" });
   }
 
-  const existingUser = await User.findOne({ email,isAdmin  });
+  const existingUser = await User.findOne({ email, isAdmin });
   if (existingUser) {
     return res.status(400).json({ message: "Email already exists" });
   }
@@ -30,9 +30,9 @@ const { name, email, password, password_confirmation, isAdmin } = req.body;
 
 // Login API
 router.post("/login", async (req, res) => {
-  const { email, password,isAdmin } = req.body;
+  const { email, password, isAdmin } = req.body;
 
-  const user = await User.findOne({ email,isAdmin});
+  const user = await User.findOne({ email, isAdmin });
   if (!user) {
     return res.status(400).json({ message: "Invalid credentials" });
   }

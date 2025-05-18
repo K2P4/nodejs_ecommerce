@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Invoice - {{ invoiceNumber }}</title>
+    <style>
+      body {
+        font-family: Verdana, Geneva, Tahoma, sans-serif;
+        margin: 50px;
+      }
+      .invoice-container {
+        max-width: 800px;
+        margin: 0 auto;
+        border: 1px solid #eee;
+        padding: 30px;
+      }
+      .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+      }
+      .logo-container {
+        width: 70px;
+        height: 70px;
+        background-color: #000;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-size: 24px;
+      }
+      .invoice-details {
+        text-align: right;
+      }
+      .billing-info,
+      .payment-info {
+        margin-bottom: 20px;
+      }
+      h2,
+      h3 {
+        color: #333;
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #eee;
+        padding: 10px;
+        text-align: left;
+      }
+      th {
+        font-weight: bold;
+      }
+      .total-section {
+        text-align: right;
+        margin-top: 20px;
+      }
+      .total-section p {
+        margin: 5px 0;
+      }
+      .total-amount {
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+      .thank-you {
+        text-align: center;
+        margin-top: 30px;
+        font-style: italic;
+        color: #777;
+      }
+      .business-info {
+        text-align: right;
+        font-size: 0.9em;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-container">
+      <div class="invoice-header">
+        <div class="logo-container"></div>
+        <div class="invoice-details">
+          <h2>INVOICE</h2>
+          <p>Invoice No. {{ invoiceNumber }}</p>
+          <p>Date: {{ formattedDate }}</p>
+        </div>
+      </div>
+
+      <div class="billing-info">
+        <h3>BILLED TO:</h3>
+        <p style="font-weight: bold">XPOS</p>
+        <p>09968213232</p>
+        <p>No.644, Eaindra 5th Street, North Okkalapa Township,Yangon</p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th style="text-align: right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td>{{ this.name }}</td>
+            <td>{{ this.quantity }}</td>
+            <td>MMK {{ formatPrice this.price }}</td>
+            <td style="text-align: right">
+              MMK {{ formatPrice (multiply this.quantity this.price) }}
+            </td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+
+      <div class="total-section">
+        <p>Subtotal: MMK {{ formatPrice subtotal }}</p>
+        <p>Tax: {{ taxRate }}%</p>
+        <p class="total-amount">Total Due: MMK {{ formatPrice totalAmount }}</p>
+      </div>
+
+      <div class="payment-info">
+        <h3>PAYMENT INFORMATION</h3>
+        <p>Bank Name:</p>
+        <p>Account Name:</p>
+        <p>Account No.:</p>
+      </div>
+
+      <div class="thank-you">
+        <p>Thank you for your Business!</p>
+      </div>
+
+      <div class="business-info">
+        <p>XPOS</p>
+        <p>No.644, Eaindra 5th Street, North Okkalapa Township,Yangon</p>
+      </div>
+    </div>
+  </body>
+</html>

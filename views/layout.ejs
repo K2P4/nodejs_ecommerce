@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= order.name %> Invoice</title>
+
+    <style>
+      body {
+        font-family: Verdana, Geneva, Tahoma, sans-serif;
+        margin: 50px;
+        font-size: 13.5px;
+      }
+      .invoice-container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .invoice-header {
+        width: 100%;
+        display: flex !important;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+      }
+
+      .invoice-details {
+        text-align: right;
+       
+      }
+      .billing-info{
+        margin-bottom: 15px;
+      }
+
+       .payment-info {
+        margin-top: 150px !important;
+       }
+
+      
+      h2,
+      h3 {
+        color: #333;
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+
+      th,
+      td {
+        border-bottom: 1px solid #eee;
+        padding: 10px;
+        text-align: left;
+      }
+
+
+      .payment-td{
+        border: none !important; padding: 5px; margin: 0;
+      }
+
+
+       th {
+        font-weight: bold;
+      }
+ 
+
+      .thank-you {
+        text-align: center;
+        margin-top: 30px;
+        font-style: italic;
+        color: #777;
+      }
+      .business-info {
+        text-align: right;
+        font-size: 0.9em;
+        color: #555;
+      }
+
+
+  
+
+     
+    </style>
+  </head>
+  <body>
+    <% // Calculate subTotal 
+    const subTotal = order.items.reduce((total, item) => total + (item.quantity * item.price), 0);
+    
+    // Calculate taxAmount const
+    taxAmount = subTotal > 200000 ? Math.round(subTotal * 0.005) : 0;
+    
+    //Calculate deliveryFee
+    deliveryFee = order.deliveryType == 0 ? 3000 : 5000;
+    
+    //Calculate allTotalAmount
+    const allTotalAmount = subTotal + deliveryFee + taxAmount; 
+    %>
+
+    <div class="invoice-container">
+      <div class="invoice-header">
+       <h2>
+        <span style="color: blue;">X</span>POS
+       </h2>
+        <div class="invoice-details">
+          <h3>INVOICE</h3>
+          <p>Invoice No. <%= order.invoiceNumber %></p>
+          <p>
+            Date: <%= new Date(order.createdAt).toLocaleDateString("en-GB") %>
+          </p>
+        </div>
+      </div>
+
+      <div class="billing-info">
+        <h3>BILLED TO:</h3>
+        <p style="font-weight: bold; margin: 5; padding: 0;">
+          <span style="color: blue;">X</span>
+          POS
+        </p>
+        <p margin: 5; padding: 0;>09968213232</p>
+        <p margin: 5; padding: 0;>No.644, Eaindra 5th Street, North Okkalapa Township,Yangon</p>
+      </div>
+
+   <table>
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Quantity</th>
+      <th>Unit Price</th>
+      <th style="text-align: right">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% order.items.forEach((item) => { %>
+      <tr>
+        <td><%= item.name %></td>
+        <td><%= item.quantity %></td>
+        <td> <%= item.price.toLocaleString() %> MMK</td>
+        <td style="text-align: right">
+           <%= (item.quantity * item.price).toLocaleString() %> MMK
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+  </table>
+
+  <table style="width: 40%; border: none; float: right  !important; ">
+    <tr style="font-weight: bold;">
+      <td style="border: none; text-align: left;">SubTotal</td>
+      <td style="border: none;">:</td>
+      <td style="border: none; text-align: right;"> <%= Number(subTotal).toLocaleString() %> MMK</td>
+    </tr>
+
+    <tr style="font-weight: bold;">
+      <td style="border: none; text-align: left;">Tax</td>
+       <td style="border: none;">:</td>
+      <td style="border: none; text-align: right;"> <%= Number(taxAmount).toLocaleString() %> MMK</td>
+    </tr>
+
+    <tr style="font-weight: bold;  border-bottom: 1px solid #eee;">
+      <td style="border: none; text-align: left;">Delivery Fee</td>
+       <td style="border: none;">:</td>
+      <td style="border: none; text-align: right;"> <%= deliveryFee %> MMK</td>
+    </tr>
+
+    <tr style="font-weight: bold;">
+      <td style="border: none; text-align: left;">Total Amount</td>
+       <td style="border: none;">:</td>
+      <td style="border: none; text-align: right;"> <%= Number(allTotalAmount).toLocaleString() %> MMK</td>
+    </tr>
+  </table>
+
+    
+
+
+      <div class="payment-info">
+        <h3 style="margin: 0; padding: 0;">PAYMENT INFORMATION</h3>
+        <table class=""  style="width: 40% !important; border: none !important;">
+          <tr>
+            <td class="payment-td">Pay Name</td>
+            <td class="payment-td">: Phyo Thura</td>
+          </tr>
+
+          <tr>
+            <td class="payment-td">Account Name</td>
+            <td class="payment-td">: Phyo Thura</td>
+          </tr>
+
+          <tr>
+            <td class="payment-td">Account No</td>
+            <td class="payment-td">: 09968213232</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="thank-you">
+        <p>Thank you for your Business!</p>
+      </div>
+
+      <div class="business-info">
+        <p>XPOS</p>
+        <p>No.644, Eaindra 5th Street, North Okkalapa Township,Yangon</p>
+      </div>
+    </div>
+  </body>
+</html>
