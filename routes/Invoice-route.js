@@ -113,7 +113,7 @@ router.post("/send-invoice", authenticateUser, async (req, res) => {
     const transporter = nodemailer.createTransport({
       host: "sandbox.smtp.mailtrap.io",
       port: 587,
-      secure: false, 
+      secure: false,
       auth: {
         user: "489e8b2330d739",
         pass: "3049d67e9a6f7e",
@@ -139,7 +139,11 @@ router.post("/send-invoice", authenticateUser, async (req, res) => {
     invoice.status = "Sent";
     invoice.sentDate = new Date();
     invoice.attachments = fileName;
-    invoice.logs.push(`Invoice was sent to ${orderData.email} at ${new Date().toISOString()}`);
+    invoice.logs.push({
+      message: `Invoice was sent to ${orderData.email}`,
+      icon: "📧", 
+      date: new Date()
+    });
     await invoice.save();
 
     return res.status(200).json({

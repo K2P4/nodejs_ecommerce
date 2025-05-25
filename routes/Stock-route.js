@@ -114,6 +114,57 @@ router.get("/export", async (req, res) => {
   }
 });
 
+// router.get("/", authenticateUser, async (req, res, next) => {
+//   try {
+//     const page = parseInt(req.query.page) || 1;
+//     const perpage = parseInt(req.query.perpage) || 10;
+//     const search = req.query.search;
+//     const selectedDate = req.query.time;
+//     const sortOrder = req.query.sort || "desc";
+//     const priceRange = req.query.priceRange;
+//     const onlyInStock = req.query.onlyInStock;
+//     const rating = req.query.rating;
+//     const discount = req.query.discount;
+
+//     const filter = {};
+//     const offset = (page - 1) * perpage;
+
+//     if (search) {
+//       filter["$text"] = { $search: search };
+//     }
+
+//     if (selectedDate) {
+//       const startOfDay = new Date(selectedDate);
+//       const endOfDay = new Date(startOfDay);
+//       endOfDay.setHours(23, 59, 59, 999);
+
+//       filter.time = { $gte: startOfDay, $lte: endOfDay };
+//     }
+
+//     const sortValue = sortOrder == "asc" ? 1 : -1;
+//     const sortField = "time";
+
+//     const stocks = await Stock.find(filter)
+//       .populate("categoryId")
+//       .sort({ [sortField]: sortValue })
+//       .limit(perpage)
+//       .skip(offset);
+//     const totalCount = await Stock.countDocuments(filter);
+//     const totalPage = Math.ceil(totalCount / perpage);
+
+//     res.status(200).json({
+//       total: totalCount,
+//       totalPage:totalPage,
+//       page,
+//       perpage,
+//       data: stocks,
+//       sort: sortOrder,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
 router.get("/", authenticateUser, async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -121,37 +172,112 @@ router.get("/", authenticateUser, async (req, res, next) => {
     const search = req.query.search;
     const selectedDate = req.query.time;
     const sortOrder = req.query.sort || "desc";
+    const priceRange = req.query.priceRange;
+    const branch = req.query.branch;
+    const onlyInStock = req.query.onlyInStock;
+    const rating = req.query.rating;
+    const discount = req.query.discount;
+    const categories = req.query.categories;
 
     const filter = {};
     const offset = (page - 1) * perpage;
 
+    // Search filter
     if (search) {
       filter["$text"] = { $search: search };
     }
 
+    if (categories && categories !== "null" && categories !== "undefined") {
+      if (Array.isArray(categories) && categories.length > 0) {
+        console.log('test' , categories);
+        filter.categoryId = { $in: categories };
+      }
+    }
+
+    // Date filter
     if (selectedDate) {
       const startOfDay = new Date(selectedDate);
       const endOfDay = new Date(startOfDay);
       endOfDay.setHours(23, 59, 59, 999);
-
       filter.time = { $gte: startOfDay, $lte: endOfDay };
     }
 
+    // Price range filter
+    if (priceRange && priceRange !== "null" && priceRange !== "undefined") {
+      let min, max;
+      if (typeof priceRange === "string" && priceRange.includes("-")) {
+        [min, max] = priceRange.split("-").map(Number);
+      } else if (Array.isArray(priceRange)) {
+        [min, max] = priceRange.map(Number);
+      }
+      if (!isNaN(min) && !isNaN(max)) {
+        filter.price = { $gte: min, $lte: max };
+      }
+    }
+
+    // Only in stock filter
+    if (
+      onlyInStock !== null &&
+      onlyInStock !== undefined &&
+      onlyInStock !== "null" &&
+      onlyInStock !== "undefined"
+    ) {
+      filter.inStock = onlyInStock == 0;
+    }
+
+    // Rating filter
+    if (
+      rating !== null &&
+      rating !== undefined &&
+      rating !== "null" &&
+      rating !== "undefined"
+    ) {
+      const minRating = Number(rating);
+      if (!isNaN(minRating)) {
+        filter.rating = { $gte: minRating };
+      }
+    }
+
+    //branch filter
+    if (
+      branch !== null &&
+      branch !== undefined &&
+      branch !== "null" &&
+      branch !== "undefined"
+    ) {
+      filter.branch = branch;
+    }
+
+    // Discount filter
+    if (
+      discount !== null &&
+      discount !== undefined &&
+      discount !== "null" &&
+      discount !== "undefined"
+    ) {
+      const minDiscount = Number(discount);
+      if (!isNaN(minDiscount)) {
+        filter.discount = { $gte: minDiscount };
+      }
+    }
+
+    // Sorting
     const sortValue = sortOrder == "asc" ? 1 : -1;
     const sortField = "time";
 
+    // Query
     const stocks = await Stock.find(filter)
       .populate("categoryId")
       .sort({ [sortField]: sortValue })
       .limit(perpage)
       .skip(offset);
-    const totalCount = await Stock.countDocuments(filter);
-    const totalPage = Math.ceil(totalCount / perpage); 
 
-    
+    const totalCount = await Stock.countDocuments(filter);
+    const totalPage = Math.ceil(totalCount / perpage);
+
     res.status(200).json({
       total: totalCount,
-      totalPage:totalPage,
+      totalPage,
       page,
       perpage,
       data: stocks,

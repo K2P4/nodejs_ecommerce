@@ -2,10 +2,16 @@ const mongoose = require("mongoose");
 
 const InvoiceSchema = new mongoose.Schema(
   {
-    invoiceNumber: { type: String, required: true, unique: true , sparse: true },
-    note: { type: String, required: false, default: null }, 
-    payDate: { type: Date, required: false , default: null}, 
-    logs: { type: Array, required: false, default: [] }, 
+    invoiceNumber: { type: String, required: true, unique: true, sparse: true },
+    note: { type: String, required: false, default: null },
+    payDate: { type: Date, required: false, default: null },
+    logs: [
+      {
+        message: { type: String, required: true },
+        icon: { type: String, required: false },
+        date: { type: Date, required: true, default: Date.now },
+      }
+    ],
     attachments: {
       type: String,
       required: false,
@@ -17,8 +23,8 @@ const InvoiceSchema = new mongoose.Schema(
       default: "Draft",
       required: true,
     },
-    sentDate: { type: Date, required: false , default: null },
-    holdReason: { type: String, required: false ,default: null },
+    sentDate: { type: Date, required: false, default: null },
+    holdReason: { type: String, required: false, default: null },
   },
   { timestamps: true }
 );
