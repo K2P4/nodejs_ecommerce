@@ -3,9 +3,22 @@ const Category = require("../Models/Category");
 const ExcelJs = require("exceljs");
 const router = express.Router();
 const multer = require("multer");
+const fs = require("fs");
 const xlsx = require("xlsx");
-
+const path = require("path");
 const uploadMemory = multer({ storage: multer.memoryStorage() });
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, "..", "public/categories");
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
 
 router.get("/export", async (req, res) => {
   try {
@@ -73,7 +86,10 @@ router.get("/", async (req, res, next) => {
     const sortValue = sortOrder == "asc" ? 1 : -1;
     const sortField = "time";
 
-    const category = await Category.find(filter).sort({[sortField]:sortValue}).limit(perpage).skip(offset);
+    const category = await Category.find(filter)
+      .sort({ [sortField]: sortValue })
+      .limit(perpage)
+      .skip(offset);
     const total = await Category.countDocuments(filter);
 
     res.status(200).json({
@@ -107,10 +123,17 @@ router.get("/:id", getByID, async (req, res) => {
   res.status(200).json({ message: "Sucessfull", category: req.category });
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", upload.single("image"), async (req, res, next) => {
   try {
     const categoryData = req.body;
+
+    if (req.file) {
+      categoryData.image = `${req.protocol}://${req.get(
+        "host"
+      )}/public/categories/${path.basename(req.file.path)}`;
+    }
     const newCategory = await new Category(categoryData);
+
     await newCategory.save();
     res.status(201).json({
       message: "Category item added successfully",
@@ -122,11 +145,30 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.put("/:id", getByID, async (req, res, next) => {
+router.put("/:id", upload.single("image"), getByID, async (req, res, next) => {
   try {
     const category = req.category;
-    Object.assign(category, req.body);
+    if (req.file) {
+      if (category.image) {
+        const oldImageName = category.image.split("/").pop(); 
 
+        const oldImagePath = path.join(
+          __dirname,
+          "..",
+          "public",
+          "categories",
+          oldImageName
+        );
+
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath); 
+        }
+      }
+
+      category.image = `${req.protocol}://${req.get("host")}/public/categories/${path.basename(req.file.path)}`;
+    }
+
+    Object.assign(category, req.body);
     await category.save();
     res.status(201).json({
       message: "category item Updated successfully",

@@ -73,7 +73,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
 
 // Logout API
 router.post("/logout", async (req, res) => {
-  // const user = await User.
+  // const user = await User.r
   res.json({ message: "Logout successful" });
 });
 
