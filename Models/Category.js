@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { create } = require("./Stock");
+
 
 const CategorySchema = new mongoose.Schema({
   name: { type: String, required: true },

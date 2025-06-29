@@ -4,6 +4,13 @@ const StockSchema = new mongoose.Schema(
   {
     code: { type: String, required: true, unique: true },
     name: { type: String, required: true, default: null },
+    brand: { type: String, required: false, default: null },
+    size: { type: Number, required: false },
+    gender: {
+      type: String,
+      enum: ["Men", "Women", "Unisex"],
+      default: "Unisex",
+    },
     images: [{ type: String, required: false }],
     description: { type: String, default: null },
     price: { type: Number, required: true, default: null },
