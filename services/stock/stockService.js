@@ -1,8 +1,26 @@
-const Stock = require("../../Models/Stock");
+const cloudinary = require("../../config/cloudinary");
 const fs = require("fs");
 const path = require("path");
 const xlsx = require("xlsx");
 const ExcelJs = require("exceljs");
+const Stock = require("../../Models/Stock");
+
+//upload
+const streamUpload = (buffer, folder) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
+      (error, result) => {
+        if (result) {
+          resolve(result);
+        } else {
+          reject(error);
+        }
+      }
+    );
+    stream.end(buffer);
+  });
+};
 
 exports.getStocks = async (query) => {
   const {
@@ -150,12 +168,21 @@ exports.createStock = async (req) => {
   }
 
   if (req.files && req.files.length > 0 && stockData.code) {
-    stockData.images = req.files.map(
-      (file) =>
-        `${req.protocol}://${req.get("host")}/public/uploads/${
-          stockData.code
-        }/${path.basename(file.path)}`
-    );
+    const imageUrls = [];
+
+    for (const file of req.files) {
+      try {
+        const result = await streamUpload(
+          file.buffer,
+          `stocks/${stockData.code}`
+        );
+        imageUrls.push(result.secure_url);
+      } catch (err) {
+        console.error("Cloudinary upload failed:", err);
+      }
+    }
+
+    stockData.images = imageUrls;
   }
 
   stockData.createdBy = req.user.name;
@@ -177,28 +204,19 @@ exports.updateStock = async (req) => {
 
   body.createdBy = req.user.name;
 
-  if (req.files && req.files.length > 0) {
-    stock.images.forEach((imgUrl) => {
-      const oldImgPath = path.join(
-        __dirname,
-        "..",
-        imgUrl.replace(`${req.protocol}://${req.get("host")}/`, "")
-      );
-      fs.unlink(oldImgPath, (err) => {
-        if (err) {
-          console.error("Error deleting old image:", err);
-        } else {
-          console.log("Old image deleted successfully");
-        }
-      });
-    });
+  if (req.files && req.files.length > 0 && body.code) {
+    const imageUrls = [];
 
-    stock.images = req.files.map(
-      (file) =>
-        `${req.protocol}://${req.get("host")}/public/uploads/${
-          body.code
-        }/${path.basename(file.path)}`
-    );
+    for (const file of req.files) {
+      try {
+        const result = await streamUpload(file.buffer, `stocks/${body.code}`);
+        imageUrls.push(result.secure_url);
+      } catch (err) {
+        console.error("Cloudinary upload failed:", err);
+      }
+    }
+
+    stock.images = imageUrls;
   }
 
   Object.assign(stock, body);

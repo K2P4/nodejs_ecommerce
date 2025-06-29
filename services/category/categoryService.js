@@ -1,8 +1,26 @@
-const Category = require("../../Models/Category");
+const cloudinary = require("../../config/cloudinary");
 const fs = require("fs");
 const path = require("path");
 const ExcelJs = require("exceljs");
 const xlsx = require("xlsx");
+const Category = require("../../Models/Category");
+
+// Upload
+const streamUpload = (buffer, folder) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
+      (error, result) => {
+        if (result) {
+          resolve(result);
+        } else {
+          reject(error);
+        }
+      }
+    );
+    stream.end(buffer);
+  });
+};
 
 exports.getFilteredCategories = async ({
   page,
@@ -38,14 +56,16 @@ exports.getFilteredCategories = async ({
   return { data, total };
 };
 
-
 exports.createCategory = async (req) => {
   const categoryData = req.body;
 
   if (req.file) {
-    categoryData.image = `${req.protocol}://${req.get(
-      "host"
-    )}/public/categories/${path.basename(req.file.path)}`;
+    try {
+      const result = await streamUpload(req.file.buffer, "categories");
+      categoryData.image = result.secure_url;
+    } catch (err) {
+      console.error("Cloudinary category upload failed:", err);
+    }
   }
 
   const newCategory = new Category(categoryData);
@@ -62,25 +82,12 @@ exports.updateCategory = async ({
   getHost,
 }) => {
   if (file) {
-    if (category.image) {
-      const oldImageName = category.image.split("/").pop();
-
-      const oldImagePath = path.join(
-        __dirname,
-        "..",
-        "public",
-        "categories",
-        oldImageName
-      );
-
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
-      }
+    try {
+      const result = await streamUpload(file.buffer, "categories");
+      category.image = result.secure_url;
+    } catch (err) {
+      console.error("Cloudinary category update upload failed:", err);
     }
-
-    category.image = `${protocol}://${getHost(
-      "host"
-    )}/public/categories/${path.basename(file.path)}`;
   }
 
   Object.assign(category, body);
@@ -110,7 +117,6 @@ exports.deleteCategoryById = async (id) => {
 
   return category;
 };
-
 
 exports.generateCategoryExcel = async () => {
   const categories = await Category.find();

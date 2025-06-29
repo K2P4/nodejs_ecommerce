@@ -4,19 +4,18 @@ const CategoryController = require("../controllers/category-controller");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
-const uploadMemory = multer({ storage: multer.memoryStorage() });
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, "..", "public/categories");
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  },
-});
+// const storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     const uploadPath = path.join(__dirname, "..", "public/categories");
+//     cb(null, uploadPath);
+//   },
+//   filename: function (req, file, cb) {
+//     cb(null, file.originalname);
+//   },
+// });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 const getByID = async (req, res, next) => {
   try {
@@ -40,7 +39,7 @@ router.post("/", upload.single("image"), CategoryController.createCategory);
 router.put("/:id", upload.single("image"), getByID, CategoryController.updateCategory);
 router.delete("/:id",getByID, CategoryController.deleteCategory);
 router.get("/export", CategoryController.exportExcel);
-router.get("/import", uploadMemory.single("file"), CategoryController.importExcel);
+router.get("/import", upload.single("file"), CategoryController.importExcel);
 
 
 

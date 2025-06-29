@@ -21,7 +21,7 @@ app.use("/public", express.static("public"));
 app.set("view engine", "ejs");
 app.set("views", __dirname + "/views");
 
-// Test 
+// Test
 app.get("/", (req, res) => {
   res.send("🎉 API is Live!");
 });
@@ -48,13 +48,12 @@ mongoose
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`🚀 Server is running on port ${port}`));
 
-
-mongoose.connection.on('connected', () => {
-  console.log('Mongoose connected successfully');
+mongoose.connection.on("connected", () => {
+  console.log("Mongoose connected successfully");
 });
-mongoose.connection.on('error', (err) => {
-  console.error('Mongoose connection error:', err);
+mongoose.connection.on("error", (err) => {
+  console.error("Mongoose connection error:", err);
 });
-mongoose.connection.on('disconnected', () => {
-  console.log('Mongoose disconnected');
+mongoose.connection.on("disconnected", () => {
+  console.log("Mongoose disconnected");
 });
